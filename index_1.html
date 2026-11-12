@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oluseun Oyeleke PLC Trainer</title>
+<meta name="description" content="A free browser-based ladder logic simulator for HNC students, with Allen-Bradley Micro800 tag names, four practice machines and self-checking exercises.">
+<style>html{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;600;700&display=swap">
+<style>
+/* Layout: machine and exercise on the left, ladder editor on the right; one column on phones. Engineering-drawing look: black line on white, green only where power flows. */
+:root{
+  --bg:#ffffff; --fg:#0c0d0f; --line:#0c0d0f; --tint:#eaf3ee; --power:#0b8a3e; --sel:#1a56db;
+  --warn:#8a4b00; --fail:#c21c2b; --red:#d92d2d; --amber:#e89f0c; --green:#12a150; --water:#2f7de1;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace; --sans:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0a0c0e; --fg:#ffffff; --line:#ffffff; --tint:#14241b; --power:#3fe286; --sel:#8cc2ff;
+  --warn:#ffc65c; --fail:#ff7a7a; --red:#ff5252; --amber:#ffbf2e; --green:#3fe286; --water:#5aa2ff; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0a0c0e; --fg:#ffffff; --line:#ffffff; --tint:#14241b; --power:#3fe286; --sel:#8cc2ff;
+  --warn:#ffc65c; --fail:#ff7a7a; --red:#ff5252; --amber:#ffbf2e; --green:#3fe286; --water:#5aa2ff; color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14px/1.45 var(--sans);padding-block:16px 32px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+h1{font-size:22px;margin:0;font-weight:700;letter-spacing:-.01em}
+h2{font-size:15px;margin:0 0 8px;font-weight:700}
+p{margin:0 0 8px}
+.top{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;margin-bottom:14px}
+.top .sub{font-size:13px;margin:2px 0 0}
+.tabs,.run{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.run{margin-left:auto}
+button,select,input,textarea{font:inherit;color:var(--fg)}
+button{background:var(--bg);border:1.5px solid var(--line);border-radius:5px;padding:6px 10px;cursor:pointer;font-weight:600}
+button:hover{background:var(--tint)}
+button[aria-pressed="true"],button.primary{background:var(--fg);color:var(--bg)}
+button:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--sel);outline-offset:2px}
+select,input[type=text],input[type=number],textarea{background:var(--bg);border:1.5px solid var(--line);border-radius:5px;padding:5px 8px;max-width:100%}
+.app{display:grid;grid-template-columns:minmax(300px,390px) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.app{grid-template-columns:minmax(0,1fr)}.run{margin-left:0}}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.panel{border:1.5px solid var(--line);border-radius:8px;padding:12px;min-width:0}
+.mono{font-family:var(--mono)}
+.scan{font:12px var(--mono);font-variant-numeric:tabular-nums}
+/* machine */
+#scene svg{display:block;width:100%;height:auto}
+#scene text{font-family:var(--sans);fill:var(--fg)}
+.io{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin-top:10px}
+@media (max-width:420px){.io{grid-template-columns:1fr}}
+.io h3{font-size:12px;margin:0 0 6px;text-transform:uppercase;letter-spacing:.08em}
+.iorow{display:flex;align-items:center;gap:8px;margin-bottom:6px;min-width:0}
+.iorow .nm{font:600 12px var(--mono);overflow-wrap:anywhere;line-height:1.2}
+.iorow .ad{font:10px var(--mono);display:block;font-weight:400}
+.pb{width:44px;height:36px;padding:0;flex:none;font-size:11px;border-radius:18px}
+.pb.act{background:var(--power);border-color:var(--power);color:var(--bg)}
+.lamp{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);flex:none}
+.lamp.on{background:var(--power);border-color:var(--power)}
+.st{font:600 11px var(--mono);margin-left:auto;flex:none}
+.extras{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.extras button{font-size:12px;padding:5px 8px}
+/* exercise */
+#exsel{width:100%;margin-bottom:8px}
+#brief ul{margin:0 0 8px;padding-left:18px}
+#brief li{margin-bottom:3px}
+.rowbtn{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+#results{list-style:none;margin:8px 0 0;padding:0}
+#results li{display:flex;gap:8px;padding:4px 0;border-top:1px solid var(--line);font-size:13px}
+#results b{font-family:var(--mono);flex:none;width:44px}
+.pass b{color:var(--power)} .failx b{color:var(--fail)}
+#verdict{font-weight:700;margin-top:8px}
+/* palette */
+.pal{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.pal button{font:600 12px var(--mono);padding:5px 7px}
+.pal .sep{width:1px;background:var(--line);margin:0 3px}
+.hint{font-size:12.5px;margin:0 0 8px}
+/* ladder */
+.ladder{overflow-x:auto;padding:6px 2px 2px}
+.rungs{display:inline-flex;flex-direction:column;min-width:100%}
+.rung{display:flex;align-items:flex-start;gap:6px;margin-bottom:4px}
+.rnum{width:30px;flex:none;margin-top:24px;padding:4px 0;font:600 12px var(--mono)}
+.rnum.selx{background:var(--sel);border-color:var(--sel);color:var(--bg)}
+.rbody{display:flex;flex:1;border-left:4px solid var(--line);border-right:4px solid var(--line);padding:2px 0}
+.running .rbody{border-left-color:var(--power)}
+.series{display:flex;align-items:flex-start;flex:1}
+.fill{flex:1;min-width:18px;height:2px;margin-top:39px;background:var(--line)}
+.fill.p{background:var(--power);height:4px;margin-top:38px}
+.n{flex:none;width:108px;cursor:pointer;border-radius:4px}
+.n .lab{height:22px;line-height:22px;font:600 12px var(--mono);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 3px}
+.n .sym{height:36px;display:flex;align-items:center}
+.n .adr{height:20px;line-height:18px;font:10px var(--mono);text-align:center;white-space:nowrap;overflow:hidden}
+.w{flex:1;height:2px;background:var(--line)}
+.pin>.sym>.w.l,.pin>.bxr>.w.l,.pout>.sym>.w.r,.pout>.bxr>.w.r{background:var(--power);height:4px}
+.n svg{width:36px;height:36px;flex:none;stroke:var(--line);stroke-width:2.5;fill:none;overflow:visible}
+.n svg text{stroke:none;fill:var(--line);font:700 11px var(--mono)}
+.pin>.sym>svg .wl,.pout>.sym>svg .wr{stroke:var(--power);stroke-width:4}
+.on>.sym>svg .sy{stroke:var(--power)} .on>.sym>svg text{fill:var(--power)}
+.n.selx{outline:2px solid var(--sel);outline-offset:-1px;background:var(--tint)}
+.slot .plus{width:26px;height:26px;border:1.5px dashed var(--line);border-radius:4px;display:grid;place-items:center;font-weight:700;flex:none}
+.n.par{width:auto;cursor:default;display:flex;flex-direction:column}
+.branch{display:flex;align-items:flex-start;position:relative;min-height:80px}
+.branch::before,.branch::after{content:"";position:absolute;width:2px;background:var(--line);top:0;bottom:0}
+.branch::before{left:0} .branch::after{right:0}
+.branch:first-child::before,.branch:first-child::after{top:39px}
+.branch:last-child::before,.branch:last-child::after{top:0;bottom:auto;height:41px}
+.par.pin>.branch::before,.par.pout>.branch::after{background:var(--power);width:4px}
+.n.blk{width:156px}
+.bxr{display:flex;align-items:flex-start}
+.bxr .w{flex:none;width:10px;margin-top:17px}
+.pin>.bxr>.w.l,.pout>.bxr>.w.r{margin-top:16px}
+.bx{flex:1;min-width:0;border:2px solid var(--line);font:11px var(--mono);background:var(--bg)}
+.blk.on .bx{border-color:var(--power)}
+.b1{display:flex;justify-content:space-between;align-items:center;height:32px;padding:0 5px;gap:4px}
+.b1 b{font-size:12px}
+.b1.c{justify-content:center;white-space:nowrap;overflow:hidden;font-weight:600}
+.b2{height:18px;padding:0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.blk .pad{height:6px}
+/* inspector */
+#insp{margin-top:10px;border-top:1.5px solid var(--line);padding-top:10px}
+.fields{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:end}
+.fields label{display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:600}
+.fields input,.fields select{font-family:var(--mono);width:170px}
+.fields input[type=number]{width:90px}
+/* watch */
+table{border-collapse:collapse;width:100%;font:12px var(--mono);font-variant-numeric:tabular-nums}
+th,td{border:1px solid var(--line);padding:3px 6px;text-align:left}
+th{font-family:var(--sans);font-size:12px}
+td.t{color:var(--power);font-weight:600}
+.tw{overflow-x:auto}
+#warn{margin:0;padding-left:18px;color:var(--warn);font-size:13px}
+#warn:empty{display:none}
+details summary{cursor:pointer;font-weight:700}
+#io-text{width:100%;height:110px;font:11px var(--mono);margin-top:8px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+
+/* intro animation */
+#intro{position:fixed;inset:0;z-index:100;background:var(--bg);display:grid;place-items:center;padding:24px;cursor:pointer;animation:introOut .6s ease 3.6s forwards}
+#intro .in{width:min(620px,100%);text-align:center}
+#intro svg{width:100%;height:auto;display:block}
+#intro svg path{fill:none;stroke:var(--fg);stroke-width:5;stroke-linecap:square;stroke-dasharray:1;stroke-dashoffset:1;animation:introDraw .45s ease forwards, introPower .4s ease 2s forwards}
+#intro .r1{animation-delay:0s,2s}#intro .w1{animation-delay:.35s,2s}#intro .c1{animation-delay:.7s,2s}#intro .w2{animation-delay:.95s,2s}#intro .o1{animation-delay:1.25s,2s}#intro .w3{animation-delay:1.5s,2s}#intro .r2{animation-delay:1.7s,2s}
+#intro svg path.r2{animation-name:introDraw}
+#intro .name{font:700 clamp(26px,6vw,44px)/1.1 var(--sans);letter-spacing:-.02em;margin:18px 0 6px;opacity:0;transform:translateY(10px);animation:introUp .6s ease 1.9s forwards}
+#intro .tag{font:600 clamp(14px,3vw,20px) var(--mono);letter-spacing:.3em;text-transform:uppercase;color:var(--power);margin:0;opacity:0;animation:introUp .6s ease 2.3s forwards}
+#intro .skip{font:12px var(--sans);margin-top:26px;opacity:0;animation:introUp .5s ease 2.6s forwards}
+@keyframes introDraw{to{stroke-dashoffset:0}}
+@keyframes introPower{to{stroke:var(--power)}}
+@keyframes introUp{to{opacity:1;transform:none}}
+@keyframes introOut{to{opacity:0;visibility:hidden}}
+@media (prefers-reduced-motion: reduce){#intro,#intro *{animation-duration:.01s!important;animation-delay:0s!important}#intro{animation:introOut .3s ease 1.8s forwards!important}}
+</style>
+</head>
+<body>
+<div id="intro" role="button" tabindex="0" aria-label="Oluseun Oyeleke PLC Trainer. Press to skip the introduction">
+  <div class="in">
+    <svg viewBox="0 0 600 150" aria-hidden="true">
+      <path class="r1" pathLength="1" d="M40 20V130"/>
+      <path class="w1" pathLength="1" d="M40 75H220"/>
+      <path class="c1" pathLength="1" d="M220 45V105M250 45V105"/>
+      <path class="w2" pathLength="1" d="M250 75H420"/>
+      <path class="o1" pathLength="1" d="M440 45Q412 75 440 105M470 45Q498 75 470 105"/>
+      <path class="w3" pathLength="1" d="M490 75H560"/>
+      <path class="r2" pathLength="1" d="M560 20V130"/>
+    </svg>
+    <p class="name">Oluseun Oyeleke</p>
+    <p class="tag">PLC Trainer</p>
+    <p class="skip">Click anywhere to skip</p>
+  </div>
+</div>
+
+
+<header class="top">
+  <div>
+    <h1>Oluseun Oyeleke PLC Trainer</h1>
+    <p class="sub">Build ladder logic, run it scan by scan, and watch the machine respond. Tags use Allen-Bradley Micro800 addresses.</p>
+  </div>
+  <div class="run" role="group" aria-label="Run controls">
+    <button id="b-run" class="primary">Pause</button>
+    <button id="b-step" title="Run one scan while paused">Step 1 scan</button>
+    <button id="b-reset" title="Clear all timers, counters and outputs">Reset PLC</button>
+    <span class="scan" id="scanct">scan 0</span>
+  </div>
+</header>
+
+<div class="tabs" id="tabs" role="tablist" aria-label="Machine" style="margin-bottom:14px"></div>
+
+<div class="app">
+  <div class="col">
+    <section class="panel" aria-labelledby="h-m">
+      <h2 id="h-m">Machine</h2>
+      <div id="scene"></div>
+      <div class="extras" id="extras"></div>
+      <div class="io">
+        <div><h3>Inputs</h3><div id="ins"></div></div>
+        <div><h3>Outputs</h3><div id="outs"></div></div>
+      </div>
+    </section>
+    <section class="panel" aria-labelledby="h-e">
+      <h2 id="h-e">Exercise</h2>
+      <select id="exsel" aria-label="Choose an exercise"></select>
+      <div id="brief"></div>
+      <div class="rowbtn">
+        <button id="b-check" class="primary">Check my program</button>
+        <button id="b-restart">Restart exercise</button>
+        <button id="b-sol">Show solution</button>
+      </div>
+      <div id="verdict" role="status"></div>
+      <ol id="results"></ol>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="panel" aria-labelledby="h-l">
+      <h2 id="h-l">Ladder program</h2>
+      <p class="hint">Click an instruction below to add it after the selected one. Click a rung number to select the whole rung. Green shows where power is flowing.</p>
+      <div class="pal" id="pal" role="toolbar" aria-label="Instructions"></div>
+      <div class="ladder" id="ladder"></div>
+      <div id="insp"></div>
+      <ul id="warn"></ul>
+    </section>
+    <section class="panel" aria-labelledby="h-w">
+      <h2 id="h-w">Live values</h2>
+      <div class="tw"><table id="watch"></table></div>
+    </section>
+    <section class="panel">
+      <details>
+        <summary>Save or share your program as text</summary>
+        <p class="hint" style="margin-top:8px">Your work is also kept in this browser automatically. To move it to another computer or hand it in, copy the text below.</p>
+        <div class="rowbtn"><button id="b-exp">Show program text</button><button id="b-copy">Copy</button><button id="b-imp">Load from text</button></div>
+        <textarea id="io-text" aria-label="Program text" spellcheck="false"></textarea>
+        <div id="io-msg" role="status"></div>
+      </details>
+    </section>
+  </div>
+</div>
+<datalist id="taglist"></datalist>
+
+<script>
+"use strict";
+/* ================= engine ================= */
+const SCAN = 20;
+let _uid = 1; const nid = () => "n" + (_uid++);
+const COILS = ["coil", "ncoil", "set", "reset"], CONTACTS = ["no", "nc", "pos", "neg"], TIMERS = ["TON", "TOF", "TP"], COUNTERS = ["CTU", "CTD"];
+const isCoil = n => COILS.includes(n.type), isBlock = n => TIMERS.includes(n.type) || COUNTERS.includes(n.type);
+const freshState = () => ({ tags: {}, blocks: {}, edge: {}, flow: {} });
+function getBool(S, name) {
+  if (!name) return false;
+  if (name.endsWith(".Q")) { const b = S.blocks[name.slice(0, -2)]; return !!(b && b.q); }
+  return !!S.tags[name];
+}
+function getNum(S, v) {
+  v = String(v).trim();
+  if (v !== "" && !isNaN(v)) return parseFloat(v);
+  const m = v.match(/^(.+)\.(CV|ET|PV|PT)$/);
+  if (m) { const b = S.blocks[m[1]]; if (!b) return 0; return m[2] === "CV" ? b.cv : m[2] === "ET" ? b.et / 1000 : m[2] === "PV" ? (b.pv || 0) : (b.pt || 0) / 1000; }
+  return getBool(S, v) ? 1 : 0;
+}
+const blk = (S, n) => S.blocks[n.name] || (S.blocks[n.name] = { et: 0, q: false, cv: 0, prev: false, run: false });
+function evalSeries(arr, p, S, dt) { for (const n of arr) p = evalNode(n, p, S, dt); return p; }
+function evalNode(n, p, S, dt) {
+  let o = false, b, v;
+  switch (n.type) {
+    case "no": o = p && getBool(S, n.tag); break;
+    case "nc": o = p && !getBool(S, n.tag); break;
+    case "pos": v = getBool(S, n.tag); o = p && v && S.edge[n.id] === false; S.edge[n.id] = v; break;
+    case "neg": v = getBool(S, n.tag); o = p && !v && S.edge[n.id] === true; S.edge[n.id] = v; break;
+    case "coil": if (n.tag) S.tags[n.tag] = p; o = p; break;
+    case "ncoil": if (n.tag) S.tags[n.tag] = !p; o = p; break;
+    case "set": if (p && n.tag) S.tags[n.tag] = true; o = p; break;
+    case "reset": if (p && n.tag) S.tags[n.tag] = false; o = p; break;
+    case "par": for (const br of n.branches) if (br.length && evalSeries(br, p, S, dt)) o = true; break;
+    case "cmp": { const a = getNum(S, n.a), c = getNum(S, n.b);
+      o = p && ({ "=": a === c, "<>": a !== c, ">": a > c, ">=": a >= c, "<": a < c, "<=": a <= c })[n.op]; break; }
+    case "TON": b = blk(S, n); b.pt = n.pt; if (p) b.et = Math.min(b.et + dt, n.pt); else b.et = 0; b.q = p && b.et >= n.pt; o = b.q; break;
+    case "TOF": b = blk(S, n); b.pt = n.pt; if (p) { b.q = true; b.et = 0; } else if (b.q) { b.et = Math.min(b.et + dt, n.pt); if (b.et >= n.pt) b.q = false; } o = b.q; break;
+    case "TP": b = blk(S, n); b.pt = n.pt; if (p && !b.prev && !b.run) { b.run = true; b.et = 0; }
+      if (b.run) { b.et = Math.min(b.et + dt, n.pt); if (b.et >= n.pt) b.run = false; } else if (!p) b.et = 0;
+      b.q = b.run; b.prev = p; o = b.q; break;
+    case "CTU": b = blk(S, n); b.pv = n.pv; if (n.reset && getBool(S, n.reset)) b.cv = 0; else if (p && !b.prev) b.cv++; b.prev = p; b.q = b.cv >= n.pv; o = b.q; break;
+    case "CTD": b = blk(S, n); b.pv = n.pv; if (n.reset && getBool(S, n.reset)) b.cv = n.pv; else if (p && !b.prev && b.cv > 0) b.cv--; b.prev = p; b.q = b.cv <= 0; o = b.q; break;
+  }
+  o = !!o; S.flow[n.id] = [p, o]; return o;
+}
+function scan(prog, S, inputs, dt) { Object.assign(S.tags, inputs); for (const r of prog.rungs) evalSeries(r.items, true, S, dt); }
+
+/* ================= program builders ================= */
+const NO = tag => ({ type: "no", tag }), NC = tag => ({ type: "nc", tag }), COIL = tag => ({ type: "coil", tag });
+const SETC = tag => ({ type: "set", tag }), RSTC = tag => ({ type: "reset", tag });
+const PAR = (...branches) => ({ type: "par", branches });
+const TMR = (type, name, s) => ({ type, name, pt: s * 1000 });
+const CTR = (type, name, pv, reset) => ({ type, name, pv, reset: reset || "" });
+const CMP = (a, op, b) => ({ type: "cmp", a, op, b: String(b) });
+const R = (...items) => ({ items });
+function stamp(prog) { // deep clone and give every node an id
+  const cl = n => { const c = Object.assign({}, n, { id: nid() }); if (c.type === "par") c.branches = n.branches.map(b => b.map(cl)); return c; };
+  return { rungs: prog.map(r => ({ id: nid(), items: r.items.map(cl) })) };
+}
+function strip(prog) { const cl = n => { const c = Object.assign({}, n); delete c.id; if (c.type === "par") c.branches = n.branches.map(b => b.map(cl)); return c; }; return prog.rungs.map(r => ({ items: r.items.map(cl) })); }
+
+/* ================= machines ================= */
+const pulse = (tag, on = true, ms = 100) => [{ set: { [tag]: on }, wait: ms }, { set: { [tag]: !on }, wait: ms }];
+const latch = t => PAR([NO("Start_PB")], [NO(t)]);
+const cvSol = {
+  1: [R(NO("Start_PB"), COIL("Belt_Motor"))],
+  2: [R(latch("Belt_Motor"), COIL("Belt_Motor"))],
+  3: [R(latch("Belt_Motor"), NO("Stop_PB"), COIL("Belt_Motor"))],
+  4: [R(latch("Belt_Motor"), NO("Stop_PB"), COIL("Belt_Motor")), R(NO("Box_Sensor"), COIL("Box_Lamp"))],
+  5: [R(latch("Belt_Motor"), NO("Stop_PB"), NC("Batch_Full"), COIL("Belt_Motor")), R(NO("Box_Sensor"), COIL("Box_Lamp")),
+      R(NO("Box_Sensor"), CTR("CTU", "CTU_1", 5, "Reset_PB"), COIL("Batch_Full"))],
+  6: [R(latch("Belt_Motor"), NO("Stop_PB"), NC("Batch_Full"), NC("Jam_Alarm"), COIL("Belt_Motor")), R(NO("Box_Sensor"), COIL("Box_Lamp")),
+      R(NO("Box_Sensor"), CTR("CTU", "CTU_1", 5, "Reset_PB"), COIL("Batch_Full")), R(NO("Box_Sensor"), TMR("TON", "TON_1", 3), COIL("Jam_Alarm"))],
+};
+const tHold = [{ say: "At rest the belt is stopped", wait: 100, expect: { Belt_Motor: false } }, { say: "Hold Start: the belt runs", set: { Start_PB: true }, wait: 200, expect: { Belt_Motor: true } }];
+const tLatch = [...tHold, { say: "Release Start: the belt keeps running", set: { Start_PB: false }, wait: 300, expect: { Belt_Motor: true } }];
+const tStop = [{ say: "Press Stop: the belt stops", set: { Stop_PB: false }, wait: 200, expect: { Belt_Motor: false } }, { say: "Release Stop: the belt stays stopped", set: { Stop_PB: true }, wait: 300, expect: { Belt_Motor: false } }];
+const tLamp = [{ say: "Box at the sensor: Box_Lamp is on", set: { Box_Sensor: true }, wait: 100, expect: { Box_Lamp: true } }, { say: "Box gone: Box_Lamp is off", set: { Box_Sensor: false }, wait: 100, expect: { Box_Lamp: false } }];
+const tStart = say => [{ set: { Start_PB: true }, wait: 100 }, { say, set: { Start_PB: false }, wait: 100, expect: { Belt_Motor: true } }];
+const tCount = [...pulse("Reset_PB"), ...tStart("Press Start again: the belt runs"),
+  ...pulse("Box_Sensor"), ...pulse("Box_Sensor"), ...pulse("Box_Sensor"), { set: { Box_Sensor: true }, wait: 100 },
+  { say: "After 4 boxes the belt is still running", set: { Box_Sensor: false }, wait: 100, expect: { Belt_Motor: true, Batch_Full: false } },
+  { set: { Box_Sensor: true }, wait: 100 }, { say: "5th box: Batch_Full on, belt stopped", set: { Box_Sensor: false }, wait: 100, expect: { Batch_Full: true, Belt_Motor: false } },
+  { set: { Start_PB: true }, wait: 100 }, { say: "Start does nothing while the batch is full", set: { Start_PB: false }, wait: 100, expect: { Belt_Motor: false } },
+  { set: { Reset_PB: true }, wait: 100 }, { say: "Reset: Batch_Full goes off", set: { Reset_PB: false }, wait: 100, expect: { Batch_Full: false } },
+  ...tStart("Start after Reset: the belt runs")];
+const tJam = [{ say: "Sensor blocked for 1 s: no alarm yet", set: { Box_Sensor: true }, wait: 1000, expect: { Jam_Alarm: false, Belt_Motor: true } }, { set: { Box_Sensor: false }, wait: 200 },
+  { say: "Sensor blocked for more than 3 s: Jam_Alarm on, belt stopped", set: { Box_Sensor: true }, wait: 3300, expect: { Jam_Alarm: true, Belt_Motor: false } },
+  { say: "Box removed: alarm clears, belt stays stopped", set: { Box_Sensor: false }, wait: 200, expect: { Jam_Alarm: false, Belt_Motor: false } }];
+
+const combos = (a, b, out, f) => [[0, 0], [0, 1], [1, 0], [1, 1]].map(([x, y]) => ({ say: `${a} ${x ? "on" : "off"}, ${b} ${y ? "on" : "off"}: ${out} ${f(x, y) ? "on" : "off"}`, set: { [a]: !!x, [b]: !!y }, wait: 100, expect: { [out]: !!f(x, y) } }));
+
+const MACHINES = {
+  conveyor: {
+    name: "Conveyor",
+    io: [["Start_PB", "in", "pb"], ["Stop_PB", "in", "pbnc"], ["Box_Sensor", "in", "sensor"], ["Reset_PB", "in", "pb"],
+         ["Belt_Motor", "out"], ["Box_Lamp", "out"], ["Batch_Full", "out"], ["Jam_Alarm", "out"]],
+    init: () => ({ boxes: [{ x: 22 }], v: 0, auto: true, jamArmed: false, done: 0, phase: 0 }),
+    sense(sim, inp) { inp.Box_Sensor = sim.boxes.some(b => Math.abs(b.x - 60) < 3); },
+    step(sim, tags, dt) {
+      const target = tags.Belt_Motor ? 20 : 0;
+      sim.v = sim.v < target ? Math.min(target, sim.v + 80 * dt) : Math.max(target, sim.v - 28 * dt);
+      const dx = sim.v * dt; sim.phase += dx;
+      sim.boxes.sort((a, b) => b.x - a.x); let ahead = Infinity;
+      for (const b of sim.boxes) {
+        if (!b.stuck) { let nx = b.x + dx; if (sim.jamArmed && b.x < 60 && nx >= 60) { nx = 60; b.stuck = true; sim.jamArmed = false; } b.x = Math.max(b.x, Math.min(nx, ahead - 8)); }
+        ahead = b.x;
+      }
+      const n = sim.boxes.length; sim.boxes = sim.boxes.filter(b => b.x < 104); sim.done += n - sim.boxes.length;
+      if (sim.auto && sim.v > 0 && (!sim.boxes.length || Math.min(...sim.boxes.map(b => b.x)) > 30)) sim.boxes.push({ x: -4 });
+    },
+    extras: [
+      { label: "Add a box", act: sim => { if (!sim.boxes.some(b => b.x < 6)) sim.boxes.push({ x: -4 }); } },
+      { label: "Auto feed boxes", toggle: "auto" },
+      { label: "Jam the next box at the sensor", toggle: "jamArmed" },
+      { label: "Remove jammed box", act: sim => { sim.boxes = sim.boxes.filter(b => !b.stuck); sim.jamArmed = false; } },
+    ],
+    svg: `<svg viewBox="0 0 640 206" role="img" aria-label="Conveyor belt with boxes, a sensor above the belt and a drive motor">
+      <g id="cv-boxes"></g>
+      <rect x="40" y="120" width="520" height="30" rx="15" fill="var(--bg)" stroke="var(--line)" stroke-width="3"/>
+      <line id="cv-belt" x1="56" y1="120" x2="544" y2="120" stroke="var(--line)" stroke-width="5" stroke-dasharray="14 10"/>
+      <circle cx="56" cy="135" r="9" fill="var(--line)"/><circle cx="544" cy="135" r="9" fill="var(--line)"/>
+      <path d="M90 150v32M510 150v32" stroke="var(--line)" stroke-width="3"/>
+      <rect x="336" y="24" width="24" height="18" fill="var(--line)"/>
+      <line id="cv-beam" x1="348" y1="42" x2="348" y2="118" stroke="var(--line)" stroke-width="2.5" stroke-dasharray="5 5"/>
+      <text x="368" y="40" font-size="20" font-weight="600">Box_Sensor</text>
+      <circle id="cv-motor" cx="596" cy="135" r="20" fill="var(--bg)" stroke="var(--line)" stroke-width="3"/>
+      <text x="596" y="140" text-anchor="middle" font-size="18" font-weight="700" id="cv-m">M</text>
+      <text x="40" y="18" font-size="20" id="cv-info"></text>
+      <text x="40" y="202" font-size="20" id="cv-msg" font-weight="600"></text></svg>`,
+    draw(sim, tags, inp, root) {
+      const px = x => 60 + x * 4.8;
+      root.querySelector("#cv-boxes").innerHTML = sim.boxes.map(b => `<rect x="${(px(b.x) - 14).toFixed(1)}" y="90" width="28" height="28" fill="var(--bg)" stroke="${b.stuck ? "var(--fail)" : "var(--line)"}" stroke-width="3"/>`).join("");
+      root.querySelector("#cv-belt").setAttribute("stroke-dashoffset", (-sim.phase * 4.8 % 24).toFixed(1));
+      root.querySelector("#cv-beam").setAttribute("stroke", inp.Box_Sensor ? "var(--power)" : "var(--line)");
+      root.querySelector("#cv-motor").setAttribute("fill", tags.Belt_Motor ? "var(--power)" : "var(--bg)");
+      root.querySelector("#cv-m").setAttribute("fill", tags.Belt_Motor ? "var(--bg)" : "var(--fg)");
+      root.querySelector("#cv-info").textContent = `Boxes delivered: ${sim.done}   Belt: ${sim.v > 0.1 ? "moving" : "stopped"}`;
+      root.querySelector("#cv-msg").textContent = sim.boxes.some(b => b.stuck) ? "A box is jammed at the sensor" : sim.jamArmed ? "The next box will jam at the sensor" : "";
+    },
+    exercises: [
+      { id: "demo", title: "Demo: the complete conveyor program", start: cvSol[6], solution: cvSol[6], tests: [...tLatch, ...tStop, ...tLamp, ...tCount, ...tJam],
+        brief: `<p>This is the finished four-rung program from the lesson. Press <b>Start</b> and watch.</p><ul><li>Boxes pass the sensor and are counted</li><li>After 5 boxes the belt stops. Press <b>Reset</b>, then <b>Start</b></li><li>Try <b>Jam the next box</b> and wait 3 seconds</li><li>Pause, then use <b>Step 1 scan</b> to see one scan at a time</li></ul>` },
+      { id: "s1", title: "Step 1: Run while Start is held", start: [], solution: cvSol[1], tests: [...tHold, { say: "Release Start: the belt stops", set: { Start_PB: false }, wait: 200, expect: { Belt_Motor: false } }],
+        brief: `<p>Build one rung so the belt runs only while Start is held.</p><ul><li>Add a <b>Direct Contact</b> with tag Start_PB</li><li>Add a <b>Direct Coil</b> with tag Belt_Motor</li></ul>` },
+      { id: "s2", title: "Step 2: Latch the belt on", start: cvSol[1], solution: cvSol[2], tests: tLatch,
+        brief: `<p>Make the belt keep running after Start is released.</p><ul><li>Select the Start_PB contact and click <b>Branch</b></li><li>Put a Direct Contact with tag Belt_Motor in the new branch</li></ul>` },
+      { id: "s3", title: "Step 3: Add the Stop button", start: cvSol[2], solution: cvSol[3], tests: [...tLatch, ...tStop],
+        brief: `<p>Add Stop_PB in series so the belt can be stopped.</p><ul><li>Stop_PB is wired normally closed, so its input is TRUE at rest</li><li>That means the ladder needs a <b>Direct Contact</b></li></ul>` },
+      { id: "s4", title: "Step 4: Lamp when a box is detected", start: cvSol[3], solution: cvSol[4], tests: [...tLatch, ...tStop, ...tLamp],
+        brief: `<p>Add a second rung: Box_Lamp is on while Box_Sensor sees a box.</p>` },
+      { id: "s5", title: "Step 5: Count to five and stop", start: cvSol[4], solution: cvSol[5], tests: [...tLatch, ...tStop, ...tLamp, ...tCount],
+        brief: `<p>Count the boxes with a CTU. At 5, turn Batch_Full on and stop the belt.</p><ul><li>New rung: Box_Sensor, then <b>CTU</b> with PV 5 and reset tag Reset_PB, then a coil for Batch_Full</li><li>In rung 1 add a <b>Reverse Contact</b> of Batch_Full</li></ul>` },
+      { id: "s6", title: "Step 6: Jam alarm with a timer", start: cvSol[5], solution: cvSol[6], tests: [...tLatch, ...tStop, ...tLamp, ...tCount, ...tJam],
+        brief: `<p>If the sensor is blocked for 3 seconds, turn Jam_Alarm on and stop the belt.</p><ul><li>New rung: Box_Sensor, then <b>TON</b> with PT 3 s, then a coil for Jam_Alarm</li><li>In rung 1 add a <b>Reverse Contact</b> of Jam_Alarm</li><li>Test it with <b>Jam the next box at the sensor</b></li></ul>` },
+      { id: "free", title: "Free build", start: [], brief: `<p>An empty program. Build anything you like with the conveyor.</p>` },
+    ],
+  },
+  tank: {
+    name: "Tank filling",
+    io: [["Start_PB", "in", "pb"], ["Stop_PB", "in", "pbnc"], ["Level_Low", "in", "sensor"], ["Level_High", "in", "sensor"], ["Run_Lamp", "out"], ["Fill_Pump", "out"], ["Full_Lamp", "out"]],
+    init: () => ({ level: 35, tap: true }),
+    sense(sim, inp) { inp.Level_Low = sim.level < 20; inp.Level_High = sim.level >= 80; },
+    step(sim, tags, dt) { sim.level = Math.max(0, Math.min(100, sim.level + ((tags.Fill_Pump ? 14 : 0) - (sim.tap ? 6 : 0)) * dt)); },
+    extras: [{ label: "Outlet tap open", toggle: "tap" }],
+    svg: `<svg viewBox="0 0 640 220" role="img" aria-label="Water tank with a fill pump, low and high level sensors and an outlet tap">
+      <rect id="tk-water" x="240" y="170" width="180" height="0" fill="var(--water)"/>
+      <path d="M240 30v160h180V30" fill="none" stroke="var(--line)" stroke-width="3"/>
+      <path d="M232 62h16M232 158h16" stroke="var(--line)" stroke-width="3"/>
+      <text x="226" y="66" text-anchor="end" font-size="20" font-weight="600" id="tk-hi">Level_High (80%)</text>
+      <text x="226" y="162" text-anchor="end" font-size="20" font-weight="600" id="tk-lo">Level_Low (20%)</text>
+      <path d="M500 40h-60v10" fill="none" stroke="var(--line)" stroke-width="3" id="tk-pipe"/>
+      <circle id="tk-pump" cx="520" cy="40" r="20" fill="var(--bg)" stroke="var(--line)" stroke-width="3"/>
+      <text x="520" y="45" text-anchor="middle" font-size="18" font-weight="700" id="tk-p">P</text>
+      <text x="520" y="88" text-anchor="middle" font-size="20" font-weight="600">Fill_Pump</text>
+      <path d="M420 182h50v14" fill="none" stroke="var(--line)" stroke-width="3"/>
+      <text x="478" y="186" font-size="20" id="tk-tap"></text>
+      <text x="330" y="214" text-anchor="middle" font-size="20" font-weight="700" id="tk-lv"></text></svg>`,
+    draw(sim, tags, inp, root) {
+      const h = sim.level * 1.6, w = root.querySelector("#tk-water"); w.setAttribute("y", (190 - h).toFixed(1)); w.setAttribute("height", h.toFixed(1));
+      root.querySelector("#tk-pump").setAttribute("fill", tags.Fill_Pump ? "var(--power)" : "var(--bg)");
+      root.querySelector("#tk-p").setAttribute("fill", tags.Fill_Pump ? "var(--bg)" : "var(--fg)");
+      root.querySelector("#tk-pipe").setAttribute("stroke", tags.Fill_Pump ? "var(--water)" : "var(--line)");
+      root.querySelector("#tk-tap").textContent = sim.tap ? "tap open" : "tap closed";
+      root.querySelector("#tk-lv").textContent = `Level ${sim.level.toFixed(0)}%` + (sim.level >= 100 ? "  OVERFLOW" : sim.level <= 0 ? "  EMPTY" : "");
+    },
+    exercises: [
+      { id: "auto", title: "Automatic level control", start: [], brief: `<p>Keep the tank between 20% and 80% automatically.</p><ul><li>Start latches Run_Lamp on. Stop turns it off</li><li>While Run_Lamp is on: Fill_Pump starts when Level_Low is TRUE and keeps running until Level_High is TRUE</li><li>Full_Lamp is on while Level_High is TRUE</li><li>The pump must be off when Run_Lamp is off</li></ul>`,
+        solution: [R(latch("Run_Lamp"), NO("Stop_PB"), COIL("Run_Lamp")), R(NO("Run_Lamp"), PAR([NO("Level_Low")], [NO("Fill_Pump")]), NC("Level_High"), COIL("Fill_Pump")), R(NO("Level_High"), COIL("Full_Lamp"))],
+        tests: [{ say: "Low level but not started: pump off", set: { Level_Low: true }, wait: 200, expect: { Fill_Pump: false, Run_Lamp: false } },
+          { set: { Start_PB: true }, wait: 100 }, { say: "Start pressed: Run_Lamp on, pump on", set: { Start_PB: false }, wait: 200, expect: { Run_Lamp: true, Fill_Pump: true } },
+          { say: "Level rises above 20%: pump keeps running", set: { Level_Low: false }, wait: 200, expect: { Fill_Pump: true } },
+          { say: "Level reaches 80%: pump off, Full_Lamp on", set: { Level_High: true }, wait: 200, expect: { Fill_Pump: false, Full_Lamp: true } },
+          { say: "Level drops below 80%: pump stays off", set: { Level_High: false }, wait: 200, expect: { Fill_Pump: false, Full_Lamp: false } },
+          { say: "Level drops below 20%: pump starts again", set: { Level_Low: true }, wait: 200, expect: { Fill_Pump: true } },
+          { set: { Stop_PB: false }, wait: 100 }, { say: "Stop pressed: everything off", set: { Stop_PB: true }, wait: 200, expect: { Fill_Pump: false, Run_Lamp: false } }] },
+      { id: "free", title: "Free build", start: [], brief: `<p>An empty program. Close the outlet tap to see the level hold.</p>` },
+    ],
+  },
+  lights: {
+    name: "Traffic lights",
+    io: [["Run_SW", "in", "sw"], ["Red", "out"], ["Amber", "out"], ["Green", "out"]],
+    init: () => ({}),
+    svg: `<svg viewBox="170 0 340 220" role="img" aria-label="Traffic light with red, amber and green lamps">
+      <rect x="280" y="10" width="80" height="176" rx="10" fill="var(--bg)" stroke="var(--line)" stroke-width="3"/>
+      <rect x="314" y="186" width="12" height="30" fill="var(--line)"/>
+      <circle id="tl-r" cx="320" cy="44" r="22" stroke="var(--line)" stroke-width="3" fill="var(--bg)"/>
+      <circle id="tl-a" cx="320" cy="98" r="22" stroke="var(--line)" stroke-width="3" fill="var(--bg)"/>
+      <circle id="tl-g" cx="320" cy="152" r="22" stroke="var(--line)" stroke-width="3" fill="var(--bg)"/>
+      <text x="376" y="49" font-size="15" font-weight="600" id="tl-rt">Red</text><text x="376" y="103" font-size="15" font-weight="600" id="tl-at">Amber</text><text x="376" y="157" font-size="15" font-weight="600" id="tl-gt">Green</text></svg>`,
+    draw(sim, tags, inp, root) {
+      [["r", "Red", "red"], ["a", "Amber", "amber"], ["g", "Green", "green"]].forEach(([k, t, c]) => {
+        root.querySelector("#tl-" + k).setAttribute("fill", tags[t] ? `var(--${c})` : "var(--bg)");
+        root.querySelector(`#tl-${k}t`).textContent = t + (tags[t] ? ": ON" : ": off");
+      });
+    },
+    exercises: [
+      { id: "flash", title: "Flashing amber", start: [], brief: `<p>While Run_SW is on, flash Amber: 1 second on, 1 second off.</p><ul><li>Use two TON timers that restart each other</li><li>A timer's output can be used as a contact. Type its name followed by <b>.Q</b>, for example T1.Q</li><li>Amber must be off when Run_SW is off</li></ul>`,
+        solution: [R(NO("Run_SW"), NC("T2.Q"), TMR("TON", "T1", 1)), R(NO("T1.Q"), TMR("TON", "T2", 1)), R(NO("T1.Q"), COIL("Amber"))],
+        tests: [{ say: "Switch off: Amber is off", wait: 300, expect: { Amber: false } },
+          { say: "Over 6 seconds Amber is on about half the time", set: { Run_SW: true }, sample: "Amber", wait: 6000, check: s => s.on > 2300 && s.on < 3700 },
+          { say: "Amber turns on about 3 times in 6 seconds", sample: "Amber", wait: 6000, check: s => s.rises >= 2 && s.rises <= 4 },
+          { say: "Switch off again: Amber goes off", set: { Run_SW: false }, wait: 300, expect: { Amber: false } }] },
+      { id: "uk", title: "UK traffic light sequence", start: [], brief: `<p>While Run_SW is on, repeat this sequence, starting with Red:</p><ul><li>Red for 4 s</li><li>Red and Amber together for 1 s</li><li>Green for 4 s</li><li>Amber for 2 s</li></ul><p>Tip: run one TON for the whole 11 s cycle and use <b>CMP</b> on its elapsed time, for example T_Cycle.ET &lt; 5.</p>`,
+        solution: [R(NO("Run_SW"), NC("T_Cycle.Q"), TMR("TON", "T_Cycle", 11)), R(NO("Run_SW"), CMP("T_Cycle.ET", "<", 5), COIL("Red")),
+          R(NO("Run_SW"), PAR([CMP("T_Cycle.ET", ">=", 4), CMP("T_Cycle.ET", "<", 5)], [CMP("T_Cycle.ET", ">=", 9)]), COIL("Amber")),
+          R(NO("Run_SW"), CMP("T_Cycle.ET", ">=", 5), CMP("T_Cycle.ET", "<", 9), COIL("Green"))],
+        tests: [{ say: "Switch off: all lamps off", wait: 300, expect: { Red: false, Amber: false, Green: false } },
+          { say: "At 2 s: Red only", set: { Run_SW: true }, wait: 2000, expect: { Red: true, Amber: false, Green: false } },
+          { say: "At 4.5 s: Red and Amber", wait: 2500, expect: { Red: true, Amber: true, Green: false } },
+          { say: "At 7 s: Green only", wait: 2500, expect: { Red: false, Amber: false, Green: true } },
+          { say: "At 10 s: Amber only", wait: 3000, expect: { Red: false, Amber: true, Green: false } },
+          { say: "At 12.5 s: back to Red only", wait: 2500, expect: { Red: true, Amber: false, Green: false } }] },
+      { id: "free", title: "Free build", start: [], brief: `<p>An empty program. Try a pedestrian crossing or your own sequence.</p>` },
+    ],
+  },
+  trainer: {
+    name: "Switches and lamps",
+    io: [["SW_0", "in", "sw"], ["SW_1", "in", "sw"], ["SW_2", "in", "sw"], ["PB_0", "in", "pb"], ["PB_1", "in", "pb"], ["Lamp_0", "out"], ["Lamp_1", "out"], ["Lamp_2", "out"], ["Lamp_3", "out"]],
+    init: () => ({}), svg: "",
+    exercises: [
+      { id: "and", title: "AND: two switches in series", start: [], brief: `<p>Lamp_0 is on only when SW_0 <b>and</b> SW_1 are both on.</p>`, solution: [R(NO("SW_0"), NO("SW_1"), COIL("Lamp_0"))], tests: combos("SW_0", "SW_1", "Lamp_0", (a, b) => a && b) },
+      { id: "or", title: "OR: two switches in parallel", start: [], brief: `<p>Lamp_0 is on when SW_0 <b>or</b> SW_1 is on. Use <b>Branch</b>.</p>`, solution: [R(PAR([NO("SW_0")], [NO("SW_1")]), COIL("Lamp_0"))], tests: combos("SW_0", "SW_1", "Lamp_0", (a, b) => a || b) },
+      { id: "not", title: "NOT: the Reverse Contact", start: [], brief: `<p>Lamp_0 is on when SW_0 is <b>off</b>, and off when SW_0 is on.</p>`, solution: [R(NC("SW_0"), COIL("Lamp_0"))],
+        tests: [{ say: "SW_0 off: Lamp_0 on", wait: 100, expect: { Lamp_0: true } }, { say: "SW_0 on: Lamp_0 off", set: { SW_0: true }, wait: 100, expect: { Lamp_0: false } }] },
+      { id: "xor", title: "Two-way lighting", start: [], brief: `<p>Like a stair light with a switch at each end: Lamp_0 is on when exactly <b>one</b> of SW_0 and SW_1 is on.</p>`,
+        solution: [R(PAR([NO("SW_0"), NC("SW_1")], [NC("SW_0"), NO("SW_1")]), COIL("Lamp_0"))], tests: combos("SW_0", "SW_1", "Lamp_0", (a, b) => a !== b) },
+      { id: "sr", title: "Set and Reset coils", start: [], brief: `<p>A quick press of PB_0 turns Lamp_0 on and it stays on. A quick press of PB_1 turns it off.</p><ul><li>Use a <b>Set Coil</b> on one rung and a <b>Reset Coil</b> on another</li></ul>`,
+        solution: [R(NO("PB_0"), SETC("Lamp_0")), R(NO("PB_1"), RSTC("Lamp_0"))],
+        tests: [{ say: "At rest: Lamp_0 off", wait: 100, expect: { Lamp_0: false } }, { set: { PB_0: true }, wait: 100 }, { say: "PB_0 pressed and released: Lamp_0 stays on", set: { PB_0: false }, wait: 300, expect: { Lamp_0: true } },
+          { set: { PB_1: true }, wait: 100 }, { say: "PB_1 pressed and released: Lamp_0 stays off", set: { PB_1: false }, wait: 300, expect: { Lamp_0: false } }] },
+      { id: "tof", title: "Stair light with an off-delay timer", start: [], brief: `<p>Press PB_0 and Lamp_0 comes on. It stays on for 5 seconds after the button is released, then goes off.</p><ul><li>Use a <b>TOF</b> timer with PT 5 s</li></ul>`,
+        solution: [R(NO("PB_0"), TMR("TOF", "T1", 5), COIL("Lamp_0"))],
+        tests: [{ say: "Button pressed: Lamp_0 on", set: { PB_0: true }, wait: 200, expect: { Lamp_0: true } }, { say: "2 s after release: still on", set: { PB_0: false }, wait: 2000, expect: { Lamp_0: true } }, { say: "5.5 s after release: off", wait: 3500, expect: { Lamp_0: false } }] },
+      { id: "free", title: "Free build", start: [], brief: `<p>An empty program with three switches, two push buttons and four lamps.</p>` },
+    ],
+  },
+};
+for (const m of Object.values(MACHINES)) { let i = 0, o = 0; m.io = m.io.map(([tag, dir, kind]) => ({ tag, dir, kind: kind || "lamp", addr: dir === "in" ? "_IO_EM_DI_" + String(i++).padStart(2, "0") : "_IO_EM_DO_" + String(o++).padStart(2, "0") })); }
+const restInputs = m => Object.fromEntries(m.io.filter(x => x.dir === "in").map(x => [x.tag, x.kind === "pbnc"]));
+
+/* ================= test runner ================= */
+function runTests(m, prog, tests) {
+  const S = freshState(), inp = restInputs(m), out = [];
+  for (const t of tests) {
+    if (t.set) Object.assign(inp, t.set);
+    const n = Math.max(2, Math.round((t.wait || 100) / SCAN)); let on = 0, rises = 0, prev = t.sample ? !!S.tags[t.sample] : false;
+    for (let i = 0; i < n; i++) { scan(prog, S, inp, SCAN); if (t.sample) { const v = !!S.tags[t.sample]; if (v) on += SCAN; if (v && !prev) rises++; prev = v; } }
+    if (t.expect) { const bad = Object.entries(t.expect).filter(([k, v]) => !!S.tags[k] !== v); out.push({ say: t.say, ok: !bad.length, why: bad.map(([k, v]) => `${k} was ${v ? "OFF" : "ON"}`).join(", ") }); }
+    else if (t.check) out.push({ say: t.say, ok: !!t.check({ on, rises }), why: `on for ${(on / 1000).toFixed(1)} s, turned on ${rises} times` });
+  }
+  return out;
+}
+window.__selftest = () => { const bad = []; for (const [k, m] of Object.entries(MACHINES)) for (const e of m.exercises) if (e.tests) { const r = runTests(m, stamp(e.solution), e.tests); r.filter(x => !x.ok).forEach(x => bad.push(`${k}/${e.id}: ${x.say} (${x.why})`)); if (e.start.length && e.id !== "demo" && runTests(m, stamp(e.start), e.tests).every(x => x.ok)) bad.push(`${k}/${e.id}: start already passes`); } return bad; };
+
+/* ================= app state ================= */
+const $ = s => document.querySelector(s), esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+let mKey, M, EX, prog, S, sim, phys, lastInp = {}, running = true, scans = 0, sel = null, byId = new Map(), slots = [];
+const faults = {};
+let store = { progs: {}, done: {}, last: null };
+try { const s = JSON.parse(localStorage.getItem("plc-trainer-v1")); if (s && s.progs) store = Object.assign(store, s); } catch (e) {}
+const save = () => { try { store.progs[mKey + "/" + EX.id] = strip(prog); store.last = [mKey, EX.id]; localStorage.setItem("plc-trainer-v1", JSON.stringify(store)); } catch (e) {} };
+const ioOf = tag => M.io.find(x => x.tag === tag);
+
+function resetPLC() { S = freshState(); M.io.forEach(x => S.tags[x.tag] = false); sim = M.init(); phys = restInputs(M); scans = 0; }
+function setMachine(k, exId) {
+  mKey = k; M = MACHINES[k]; sel = null;
+  $("#tabs").innerHTML = Object.entries(MACHINES).map(([key, m]) => `<button role="tab" aria-selected="${key === k}" aria-pressed="${key === k}" data-m="${key}">${m.name}</button>`).join("");
+  $("#scene").innerHTML = M.svg || ""; $("#scene").hidden = !M.svg;
+  $("#extras").innerHTML = (M.extras || []).map((x, i) => `<button data-x="${i}" ${x.toggle ? 'aria-pressed="false"' : ""}>${x.label}</button>`).join("");
+  resetPLC(); renderIO(); setExercise(exId || M.exercises[0].id);
+}
+function setExercise(id, forceStart) {
+  EX = M.exercises.find(e => e.id === id) || M.exercises[0];
+  $("#exsel").innerHTML = M.exercises.map(e => `<option value="${e.id}" ${e === EX ? "selected" : ""}>${store.done[mKey + "/" + e.id] ? "✓ " : ""}${esc(e.title)}</option>`).join("");
+  const saved = store.progs[mKey + "/" + EX.id];
+  try { prog = stamp(!forceStart && saved ? saved : EX.start); } catch (e) { prog = stamp(EX.start); }
+  $("#brief").innerHTML = EX.brief; $("#results").innerHTML = ""; $("#verdict").textContent = "";
+  $("#b-check").hidden = !EX.tests; $("#b-sol").hidden = !EX.solution;
+  sel = null; resetPLC(); renderIO(); changed();
+}
+function changed() { renderLadder(); renderInsp(); validate(); save(); tickOnce(false); paint(true); }
+
+/* ================= I/O panel ================= */
+function renderIO() {
+  $("#ins").innerHTML = M.io.filter(x => x.dir === "in").map(x => {
+    const ctl = x.kind === "sensor" ? `<span class="lamp" data-lamp="${x.tag}" title="Set by the machine"></span>` : `<button class="pb" data-in="${x.tag}" data-kind="${x.kind}" aria-label="${x.tag} ${x.kind === "sw" ? "switch" : "push button"}">${x.kind === "sw" ? "OFF" : "push"}</button>`;
+    return `<div class="iorow">${ctl}<span class="nm">${x.tag}<span class="ad">${x.addr}${x.kind === "pbnc" ? " (NC)" : ""}</span></span><span class="st" data-st="${x.tag}"></span></div>`;
+  }).join("") + M.io.filter(x => x.kind === "pbnc").map(x => `<div class="extras"><button data-fault="${x.tag}" aria-pressed="${!!faults[mKey + x.tag]}" style="font-size:12px;padding:5px 8px">Fault: break the ${x.tag} wire</button></div>`).join("");
+  $("#outs").innerHTML = M.io.filter(x => x.dir === "out").map(x => `<div class="iorow"><span class="lamp" data-lamp="${x.tag}"></span><span class="nm">${x.tag}<span class="ad">${x.addr}</span></span><span class="st" data-st="${x.tag}"></span></div>`).join("");
+}
+function press(btn, down) { const t = btn.dataset.in, k = btn.dataset.kind; if (k === "sw") return; phys[t] = k === "pbnc" ? !down : down; btn.classList.toggle("act", down); }
+$("#ins").addEventListener("pointerdown", e => { const b = e.target.closest("[data-in]"); if (b && b.dataset.kind !== "sw") { press(b, true); try { b.setPointerCapture(e.pointerId); } catch (_) {} } });
+["pointerup", "pointercancel", "lostpointercapture"].forEach(ev => $("#ins").addEventListener(ev, e => { const b = e.target.closest("[data-in]"); if (b) press(b, false); }));
+$("#ins").addEventListener("keydown", e => { const b = e.target.closest("[data-in]"); if (b && (e.key === " " || e.key === "Enter") && b.dataset.kind !== "sw") { e.preventDefault(); press(b, true); } });
+$("#ins").addEventListener("keyup", e => { const b = e.target.closest("[data-in]"); if (b && b.dataset.kind !== "sw") press(b, false); });
+$("#ins").addEventListener("click", e => {
+  const b = e.target.closest("[data-in]"); if (b && b.dataset.kind === "sw") { phys[b.dataset.in] = !phys[b.dataset.in]; b.textContent = phys[b.dataset.in] ? "ON" : "OFF"; b.classList.toggle("act", phys[b.dataset.in]); }
+  const f = e.target.closest("[data-fault]"); if (f) { faults[mKey + f.dataset.fault] = !faults[mKey + f.dataset.fault]; f.setAttribute("aria-pressed", faults[mKey + f.dataset.fault]); }
+});
+$("#extras").addEventListener("click", e => { const b = e.target.closest("[data-x]"); if (!b) return; const x = M.extras[+b.dataset.x]; if (x.toggle) sim[x.toggle] = !sim[x.toggle]; else x.act(sim); });
+
+/* ================= simulation loop ================= */
+function readInputs() { const inp = Object.assign({}, phys); if (M.sense) M.sense(sim, inp); M.io.forEach(x => { if (faults[mKey + x.tag]) inp[x.tag] = false; }); return inp; }
+function tickOnce(physics = true) { lastInp = readInputs(); scan(prog, S, lastInp, physics ? SCAN : 0); if (physics) { scans++; if (M.step) M.step(sim, S.tags, SCAN / 1000); } }
+let lastT = 0, acc = 0, lastWatch = 0;
+function frame(t) {
+  const d = Math.min(t - lastT, 200); lastT = t;
+  if (running) { acc += d; let n = 0; while (acc >= SCAN && n < 12) { tickOnce(); acc -= SCAN; n++; } if (n === 12) acc = 0; }
+  paint(t - lastWatch > 120); if (t - lastWatch > 120) lastWatch = t;
+  requestAnimationFrame(frame);
+}
+function paint(slow) {
+  for (const [id, e] of byId) {
+    const el = e.el, f = S.flow[id] || [false, false], n = e.node; if (!el) continue;
+    el.classList.toggle("pin", f[0]); el.classList.toggle("pout", f[1]);
+    let on = false;
+    if (n.type === "no" || COILS.includes(n.type)) on = getBool(S, n.tag); else if (n.type === "nc") on = !getBool(S, n.tag); else if (n.type === "pos" || n.type === "neg" || n.type === "cmp") on = f[1]; else if (isBlock(n)) on = !!(S.blocks[n.name] && S.blocks[n.name].q);
+    el.classList.toggle("on", on);
+    if (isBlock(n) && e.val) { const b = S.blocks[n.name] || { et: 0, cv: 0 }; e.val.textContent = TIMERS.includes(n.type) ? `ET  ${(b.et / 1000).toFixed(1)} s` : `CV  ${b.cv}`; }
+  }
+  document.querySelectorAll("#ladder .fill").forEach(el => { const s = el.dataset.src; el.classList.toggle("p", s === "rail" ? true : !!(S.flow[s] && S.flow[s][1])); });
+  $("#ladder").classList.toggle("running", true);
+  document.querySelectorAll("[data-lamp]").forEach(el => { const t = el.dataset.lamp, x = ioOf(t); el.classList.toggle("on", x.dir === "in" ? !!lastInp[t] : !!S.tags[t]); });
+  document.querySelectorAll("[data-st]").forEach(el => { const t = el.dataset.st, x = ioOf(t), v = x.dir === "in" ? !!lastInp[t] : !!S.tags[t], s = v ? "TRUE" : "FALSE"; if (el.textContent !== s) el.textContent = s; });
+  (M.extras || []).forEach((x, i) => { if (x.toggle) $(`#extras [data-x="${i}"]`).setAttribute("aria-pressed", !!sim[x.toggle]); });
+  if (M.draw) M.draw(sim, S.tags, lastInp, $("#scene"));
+  $("#scanct").textContent = `scan ${scans}  (${(scans * SCAN / 1000).toFixed(1)} s)`;
+  if (slow) renderWatch();
+}
+function renderWatch() {
+  const used = new Set(M.io.map(x => x.tag)); walk(n => { if (n.tag && !n.tag.endsWith(".Q")) used.add(n.tag); if (n.reset) used.add(n.reset); });
+  let h = "<tr><th>Tag</th><th>Address</th><th>Value</th></tr>";
+  for (const t of used) { const x = ioOf(t), v = x && x.dir === "in" ? !!lastInp[t] : !!S.tags[t]; h += `<tr><td>${esc(t)}</td><td>${x ? x.addr : "memory bit"}</td><td class="${v ? "t" : ""}">${v ? "TRUE" : "FALSE"}</td></tr>`; }
+  walk(n => { if (isBlock(n)) { const b = S.blocks[n.name] || { et: 0, cv: 0, q: false }; h += `<tr><td>${esc(n.name)}</td><td>${n.type} ${TIMERS.includes(n.type) ? "timer" : "counter"}</td><td class="${b.q ? "t" : ""}">${TIMERS.includes(n.type) ? `ET ${(b.et / 1000).toFixed(1)} / ${n.pt / 1000} s` : `CV ${b.cv} / ${n.pv}`}, Q ${b.q ? "TRUE" : "FALSE"}</td></tr>`; } });
+  const w = $("#watch"); if (w.innerHTML !== h) w.innerHTML = h;
+}
+
+/* ================= ladder rendering ================= */
+function walk(cb) { const go = (arr, rung) => arr.forEach((n, i) => { cb(n, arr, i, rung); if (n.type === "par") n.branches.forEach(b => go(b, rung)); }); prog.rungs.forEach(r => go(r.items, r)); }
+const SYM = {
+  no: `<path class="wl" d="M0 18H11"/><path class="wr" d="M25 18H36"/><path class="sy" d="M11 5V31M25 5V31"/>`,
+  nc: `<path class="wl" d="M0 18H11"/><path class="wr" d="M25 18H36"/><path class="sy" d="M11 5V31M25 5V31M7 30L29 6"/>`,
+  pos: `<path class="wl" d="M0 18H9"/><path class="wr" d="M27 18H36"/><path class="sy" d="M9 5V31M27 5V31"/><text x="18" y="22" text-anchor="middle">P</text>`,
+  neg: `<path class="wl" d="M0 18H9"/><path class="wr" d="M27 18H36"/><path class="sy" d="M9 5V31M27 5V31"/><text x="18" y="22" text-anchor="middle">N</text>`,
+  coil: `<path class="wl" d="M0 18H7"/><path class="wr" d="M29 18H36"/><path class="sy" d="M13 5Q1 18 13 31M23 5Q35 18 23 31"/>`,
+};
+SYM.ncoil = SYM.coil + `<text x="18" y="22" text-anchor="middle">/</text>`; SYM.set = SYM.coil + `<text x="18" y="22" text-anchor="middle">S</text>`; SYM.reset = SYM.coil + `<text x="18" y="22" text-anchor="middle">R</text>`;
+const addrOf = t => { if (!t) return "choose a tag"; if (t.endsWith(".Q")) return "block output"; const x = ioOf(t); return x ? x.addr : "memory bit"; };
+function nodeHTML(n, rung) {
+  const cls = sel && sel.type === "node" && sel.id === n.id ? " selx" : "";
+  if (n.type === "par") return `<div class="n par" data-id="${n.id}">${n.branches.map(b => `<div class="branch">${seriesHTML(b, rung, false)}</div>`).join("")}</div>`;
+  if (n.type === "cmp") return `<div class="n blk${cls}" data-id="${n.id}" tabindex="0" role="button" aria-label="Compare ${esc(n.a)} ${n.op} ${esc(n.b)}"><div class="lab">CMP</div><div class="bxr"><i class="w l"></i><div class="bx"><div class="b1 c">${esc(n.a || "?")} ${esc(n.op)} ${esc(n.b)}</div></div><i class="w r"></i></div><div class="pad"></div></div>`;
+  if (isBlock(n)) { const tm = TIMERS.includes(n.type);
+    return `<div class="n blk${cls}" data-id="${n.id}" tabindex="0" role="button" aria-label="${n.type} ${esc(n.name)}"><div class="lab">${esc(n.name)}</div><div class="bxr"><i class="w l"></i><div class="bx"><div class="b1"><span>${tm ? "IN" : n.type === "CTU" ? "CU" : "CD"}</span><b>${n.type}</b><span>Q</span></div><div class="b2">${tm ? `PT  T#${n.pt / 1000}s` : `PV  ${n.pv}`}</div>${tm ? "" : `<div class="b2">${n.type === "CTU" ? "RESET" : "LOAD"} ${esc(n.reset || "-")}</div>`}<div class="b2" data-val></div></div><i class="w r"></i></div><div class="pad"></div></div>`; }
+  return `<div class="n${cls}" data-id="${n.id}" tabindex="0" role="button" aria-label="${n.type} ${esc(n.tag)}"><div class="lab">${esc(n.tag || "?")}</div><div class="sym"><i class="w l"></i><svg viewBox="0 0 36 36" aria-hidden="true">${SYM[n.type]}</svg><i class="w r"></i></div><div class="adr">${addrOf(n.tag)}</div></div>`;
+}
+function seriesHTML(arr, rung, main) {
+  let h = "";
+  if (!arr.length) { slots.push({ arr, rung }); const c = sel && sel.type === "slot" && sel.arr === arr ? " selx" : ""; h += `<div class="n slot${c}" data-slot="${slots.length - 1}" tabindex="0" role="button" aria-label="Empty position"><div class="lab"></div><div class="sym"><i class="w l"></i><span class="plus">+</span><i class="w r"></i></div><div class="adr">empty</div></div>`; }
+  const endCoil = main && arr.length && isCoil(arr[arr.length - 1]);
+  arr.forEach((n, i) => { byId.set(n.id, { node: n, arr, idx: i, rung }); if (endCoil && i === arr.length - 1) h += `<i class="fill" data-src="${i ? arr[i - 1].id : "rail"}"></i>`; h += nodeHTML(n, rung); });
+  if (!endCoil) h += `<i class="fill" data-src="${arr.length ? arr[arr.length - 1].id : "none"}"></i>`;
+  return `<div class="series">${h}</div>`;
+}
+function renderLadder() {
+  byId = new Map(); slots = [];
+  $("#ladder").innerHTML = `<div class="rungs">` + (prog.rungs.map((r, i) => `<div class="rung"><button class="rnum${sel && sel.type === "rung" && sel.rung === r ? " selx" : ""}" data-rung="${i}" aria-label="Select rung ${i + 1}">${i + 1}</button><div class="rbody">${seriesHTML(r.items, r, true)}</div></div>`).join("") || `<p class="hint">No rungs yet. Click <b>+ Rung</b> to begin.</p>`) + `</div>`;
+  for (const [id, e] of byId) { e.el = $(`#ladder [data-id="${id}"]`); e.val = e.el && e.el.querySelector(":scope > .bxr [data-val]"); }
+  const tags = new Set(M.io.map(x => x.tag)); walk(n => { if (n.tag) tags.add(n.tag); if (isBlock(n)) tags.add(n.name + ".Q"); });
+  $("#taglist").innerHTML = [...tags].map(t => `<option value="${esc(t)}">`).join("");
+}
+$("#ladder").addEventListener("click", e => {
+  const s = e.target.closest("[data-slot]"), n = e.target.closest(".n[data-id]:not(.par)"), r = e.target.closest("[data-rung]");
+  if (s) sel = { type: "slot", arr: slots[+s.dataset.slot].arr, rung: slots[+s.dataset.slot].rung }; else if (n) sel = { type: "node", id: n.dataset.id }; else if (r) sel = { type: "rung", rung: prog.rungs[+r.dataset.rung] }; else return;
+  renderLadder(); renderInsp(); paint(false);
+});
+$("#ladder").addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches(".n")) { e.preventDefault(); e.target.click(); } if ((e.key === "Delete" || e.key === "Backspace") && e.target.matches(".n,.rnum")) { e.preventDefault(); del(); } });
+
+/* ================= editing ================= */
+const PAL = [["no", "┤ ├ Direct Contact"], ["nc", "┤/├ Reverse Contact"], ["pos", "┤P├ Rising edge"], ["neg", "┤N├ Falling edge"], 0, ["coil", "( ) Direct Coil"], ["set", "(S) Set Coil"], ["reset", "(R) Reset Coil"], ["ncoil", "(/) Reverse Coil"], 0, ["TON", "TON"], ["TOF", "TOF"], ["TP", "TP"], ["CTU", "CTU"], ["CTD", "CTD"], ["cmp", "CMP"], 0, ["branch", "Branch"], ["rung", "+ Rung"]];
+$("#pal").innerHTML = PAL.map(p => p ? `<button data-p="${p[0]}">${p[1]}</button>` : `<span class="sep"></span>`).join("");
+$("#pal").addEventListener("click", e => { const b = e.target.closest("[data-p]"); if (!b) return; const p = b.dataset.p; if (p === "rung") addRung(); else if (p === "branch") addBranch(); else insert(make(p)); });
+function freeName(pre) { const used = new Set(); walk(n => { if (n.name) used.add(n.name); }); let i = 1; while (used.has(pre + "_" + i)) i++; return pre + "_" + i; }
+function make(t) {
+  const fin = M.io.find(x => x.dir === "in").tag, fout = M.io.find(x => x.dir === "out").tag;
+  if (CONTACTS.includes(t)) return { id: nid(), type: t, tag: fin };
+  if (COILS.includes(t)) return { id: nid(), type: t, tag: fout };
+  if (TIMERS.includes(t)) return { id: nid(), type: t, name: freeName(t), pt: 3000 };
+  if (COUNTERS.includes(t)) return { id: nid(), type: t, name: freeName(t), pv: 5, reset: "" };
+  let a = ""; walk(n => { if (!a && isBlock(n)) a = n.name + (TIMERS.includes(n.type) ? ".ET" : ".CV"); });
+  return { id: nid(), type: "cmp", a, op: ">=", b: "1" };
+}
+function addRung() { const r = { id: nid(), items: [] }; const i = sel && sel.type === "rung" ? prog.rungs.indexOf(sel.rung) + 1 : sel && sel.type === "node" && byId.get(sel.id) ? prog.rungs.indexOf(byId.get(sel.id).rung) + 1 : prog.rungs.length; prog.rungs.splice(i, 0, r); sel = { type: "slot", arr: r.items, rung: r }; changed(); }
+function insert(n) {
+  let arr, idx;
+  if (sel && sel.type === "node" && byId.get(sel.id)) { const e = byId.get(sel.id); arr = e.arr; idx = e.idx + 1; }
+  else if (sel && sel.type === "slot") { arr = sel.arr; idx = 0; }
+  else { let r = sel && sel.type === "rung" ? sel.rung : prog.rungs[prog.rungs.length - 1]; if (!r) { r = { id: nid(), items: [] }; prog.rungs.push(r); } arr = r.items; idx = arr.length; if (idx && isCoil(arr[idx - 1]) && !isCoil(n)) idx--; }
+  arr.splice(idx, 0, n); sel = { type: "node", id: n.id }; changed();
+}
+function parOf(arr) { let res = null; walk((n, a, i) => { if (n.type === "par") { const b = n.branches.indexOf(arr); if (b >= 0) res = { par: n, holder: a, at: i, b }; } }); return res; }
+function addBranch() {
+  if (!sel || sel.type === "rung") { msg("Select a contact first, then click Branch to put a parallel path under it."); return; }
+  const arr = sel.type === "node" ? byId.get(sel.id).arr : sel.arr, p = parOf(arr); let nb = [];
+  if (p) p.par.branches.splice(p.b + 1, 0, nb);
+  else if (sel.type === "node") { const e = byId.get(sel.id); e.arr[e.idx] = { id: nid(), type: "par", branches: [[e.node], nb] }; }
+  else return;
+  sel = { type: "slot", arr: nb, rung: null }; changed();
+}
+function del() {
+  if (!sel) return;
+  if (sel.type === "rung") { prog.rungs.splice(prog.rungs.indexOf(sel.rung), 1); sel = null; }
+  else if (sel.type === "node") { const e = byId.get(sel.id); if (!e) return; e.arr.splice(e.idx, 1); sel = e.arr.length ? { type: "node", id: e.arr[Math.max(0, e.idx - 1)].id } : { type: "slot", arr: e.arr, rung: e.rung }; if (sel.type === "node" && e.arr[Math.max(0, e.idx - 1)].type === "par") sel = null; }
+  else { const p = parOf(sel.arr); if (p) { p.par.branches.splice(p.b, 1); if (p.par.branches.length === 1) p.holder.splice(p.at, 1, ...p.par.branches[0]); } else { const i = prog.rungs.findIndex(r => r.items === sel.arr); if (i >= 0) prog.rungs.splice(i, 1); } sel = null; }
+  changed();
+}
+function move(d) {
+  if (!sel) return;
+  if (sel.type === "rung") { const i = prog.rungs.indexOf(sel.rung), j = i + d; if (j < 0 || j >= prog.rungs.length) return; prog.rungs.splice(i, 1); prog.rungs.splice(j, 0, sel.rung); }
+  else if (sel.type === "node") { const e = byId.get(sel.id), j = e.idx + d; if (j < 0 || j >= e.arr.length) return; e.arr.splice(e.idx, 1); e.arr.splice(j, 0, e.node); } else return;
+  changed();
+}
+let msgT; function msg(t) { $("#insp").insertAdjacentHTML("afterbegin", `<p class="hint" id="tmpmsg"><b>${esc(t)}</b></p>`); clearTimeout(msgT); msgT = setTimeout(() => { const m = $("#tmpmsg"); if (m) m.remove(); }, 4000); }
+
+const TYPE_NAMES = { no: "Direct Contact", nc: "Reverse Contact", pos: "Rising edge contact", neg: "Falling edge contact", coil: "Direct Coil", ncoil: "Reverse Coil", set: "Set Coil", reset: "Reset Coil", TON: "TON on-delay timer", TOF: "TOF off-delay timer", TP: "TP pulse timer", CTU: "CTU count up", CTD: "CTD count down", cmp: "Compare" };
+const HELP = { no: "Passes power when the tag is TRUE.", nc: "Passes power when the tag is FALSE.", pos: "Passes power for one scan when the tag changes from FALSE to TRUE.", neg: "Passes power for one scan when the tag changes from TRUE to FALSE.",
+  coil: "The tag is TRUE while power reaches the coil.", ncoil: "The tag is the opposite of the power reaching the coil.", set: "Turns the tag TRUE and leaves it TRUE until a Reset Coil clears it.", reset: "Turns the tag FALSE.",
+  TON: "Q turns on after IN has been TRUE for the whole of PT.", TOF: "Q turns on with IN and stays on for PT after IN goes FALSE.", TP: "Q gives one pulse of length PT each time IN goes TRUE.",
+  CTU: "Adds 1 each time the input goes from FALSE to TRUE. Q is TRUE when CV reaches PV.", CTD: "Subtracts 1 on each FALSE to TRUE change. LOAD sets CV to PV. Q is TRUE when CV is 0.", cmp: "Passes power when the comparison is true. Use a number, or a block value such as CTU_1.CV or TON_1.ET (seconds)." };
+function renderInsp() {
+  const box = $("#insp"); let h = "";
+  if (!sel) h = `<p class="hint">Nothing selected. Click an instruction, an empty <b>+</b> position or a rung number.</p>`;
+  else if (sel.type === "rung") h = `<h2>Rung ${prog.rungs.indexOf(sel.rung) + 1}</h2><div class="rowbtn"><button data-a="up">Move up</button><button data-a="down">Move down</button><button data-a="del">Delete rung</button></div>`;
+  else if (sel.type === "slot") h = `<h2>Empty position</h2><p class="hint">Click an instruction above to place it here.</p><div class="rowbtn"><button data-a="del">${parOf(sel.arr) ? "Delete this branch" : "Delete rung"}</button></div>`;
+  else { const e = byId.get(sel.id); if (!e) { box.innerHTML = ""; return; } const n = e.node; let f = "";
+    const kinds = CONTACTS.includes(n.type) ? CONTACTS : COILS.includes(n.type) ? COILS : TIMERS.includes(n.type) ? TIMERS : COUNTERS.includes(n.type) ? COUNTERS : null;
+    if (kinds) f += `<label>Instruction<select id="f-type">${kinds.map(k => `<option value="${k}" ${k === n.type ? "selected" : ""}>${TYPE_NAMES[k]}</option>`).join("")}</select></label>`;
+    if ("tag" in n) f += `<label>Tag<input type="text" id="f-tag" list="taglist" value="${esc(n.tag)}" autocomplete="off"></label>`;
+    if (isBlock(n)) f += `<label>Name<input type="text" id="f-name" value="${esc(n.name)}" autocomplete="off"></label>`;
+    if (TIMERS.includes(n.type)) f += `<label>PT (seconds)<input type="number" id="f-pt" min="0.1" step="0.1" value="${n.pt / 1000}"></label>`;
+    if (COUNTERS.includes(n.type)) f += `<label>PV (preset)<input type="number" id="f-pv" min="1" step="1" value="${n.pv}"></label><label>${n.type === "CTU" ? "RESET" : "LOAD"} tag<input type="text" id="f-reset" list="taglist" value="${esc(n.reset)}" autocomplete="off"></label>`;
+    if (n.type === "cmp") f += `<label>Value A<input type="text" id="f-a" value="${esc(n.a)}" autocomplete="off"></label><label>Compare<select id="f-op">${["=", "<>", ">", ">=", "<", "<="].map(o => `<option ${o === n.op ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></label><label>Value B<input type="text" id="f-b" value="${esc(n.b)}" autocomplete="off"></label>`;
+    h = `<h2>${TYPE_NAMES[n.type]}</h2><p class="hint">${HELP[n.type]}${"tag" in n ? " Pick a tag from the list, or type a new name to make a memory bit." : ""}</p><div class="fields">${f}</div><div class="rowbtn"><button data-a="up">Move left</button><button data-a="down">Move right</button><button data-a="branch">Branch</button><button data-a="del">Delete</button></div>`; }
+  box.innerHTML = h;
+}
+$("#insp").addEventListener("click", e => { const a = e.target.closest("[data-a]"); if (!a) return; ({ up: () => move(-1), down: () => move(1), del, branch: addBranch })[a.dataset.a](); });
+$("#insp").addEventListener("change", e => {
+  if (!sel || sel.type !== "node") return; const n = byId.get(sel.id).node, v = e.target.value.trim(), clean = s => s.replace(/[^\w.]/g, "_");
+  switch (e.target.id) {
+    case "f-type": n.type = v; break; case "f-tag": n.tag = clean(v); break; case "f-name": if (v) n.name = clean(v).replace(/\./g, "_"); break;
+    case "f-pt": n.pt = Math.max(100, Math.round(parseFloat(v) * 1000) || 1000); break; case "f-pv": n.pv = Math.max(1, parseInt(v) || 1); break; case "f-reset": n.reset = clean(v); break;
+    case "f-a": n.a = clean(v); break; case "f-b": n.b = clean(v); break; case "f-op": n.op = v; break; default: return;
+  }
+  changed();
+});
+
+function validate() {
+  const w = [], coils = {};
+  prog.rungs.forEach((r, i) => {
+    const k = i + 1; if (!r.items.length) { w.push(`Rung ${k} is empty.`); return; }
+    const last = r.items[r.items.length - 1]; if (!isCoil(last) && !isBlock(last)) w.push(`Rung ${k} has no output. End it with a coil, timer or counter.`);
+    r.items.forEach((n, j) => { if (isCoil(n) && j < r.items.length - 1) w.push(`Rung ${k}: a coil should be the last instruction on the rung.`); });
+  });
+  walk((n, arr, i, r) => { const k = prog.rungs.indexOf(r) + 1;
+    if (n.type === "par" && n.branches.some(b => !b.length)) w.push(`Rung ${k} has an empty branch. It passes no power until you add a contact.`);
+    if ("tag" in n && !n.tag) w.push(`Rung ${k}: an instruction has no tag.`);
+    if (n.type === "coil" || n.type === "ncoil") { if (coils[n.tag]) w.push(`${n.tag} is driven by a coil on rung ${coils[n.tag]} and rung ${k}. The last rung wins, so use one coil per output.`); else coils[n.tag] = k; }
+    if (isCoil(n)) { const x = ioOf(n.tag); if (x && x.dir === "in") w.push(`Rung ${k}: ${n.tag} is an input. A coil should write to an output or a memory bit.`); }
+  });
+  $("#warn").innerHTML = [...new Set(w)].map(x => `<li>${esc(x)}</li>`).join("");
+}
+
+/* ================= buttons ================= */
+$("#tabs").addEventListener("click", e => { const b = e.target.closest("[data-m]"); if (b) setMachine(b.dataset.m); });
+$("#exsel").addEventListener("change", e => setExercise(e.target.value));
+$("#b-run").addEventListener("click", () => { running = !running; $("#b-run").textContent = running ? "Pause" : "Run"; $("#b-run").classList.toggle("primary", running); acc = 0; });
+$("#b-step").addEventListener("click", () => { if (running) $("#b-run").click(); tickOnce(); paint(true); });
+$("#b-reset").addEventListener("click", () => { resetPLC(); renderIO(); tickOnce(false); paint(true); });
+$("#b-restart").addEventListener("click", () => setExercise(EX.id, true));
+$("#b-sol").addEventListener("click", () => { prog = stamp(EX.solution); sel = null; resetPLC(); renderIO(); changed(); $("#verdict").textContent = "Solution loaded. Run it, then use Restart exercise to try it yourself."; $("#results").innerHTML = ""; });
+$("#b-check").addEventListener("click", () => {
+  const r = runTests(M, prog, EX.tests), ok = r.every(x => x.ok);
+  $("#results").innerHTML = r.map(x => `<li class="${x.ok ? "pass" : "failx"}"><b>${x.ok ? "PASS" : "FAIL"}</b><span>${esc(x.say)}${x.ok ? "" : ` <i>(${esc(x.why)})</i>`}</span></li>`).join("");
+  $("#verdict").textContent = ok ? `All ${r.length} checks passed.` : `${r.filter(x => !x.ok).length} of ${r.length} checks failed. Fix the first FAIL and check again.`;
+  if (ok) { store.done[mKey + "/" + EX.id] = true; save(); const o = $("#exsel").selectedOptions[0]; if (o && !o.textContent.startsWith("✓")) o.textContent = "✓ " + o.textContent; }
+});
+$("#b-exp").addEventListener("click", () => { $("#io-text").value = JSON.stringify({ machine: mKey, exercise: EX.id, rungs: strip(prog) }); $("#io-msg").textContent = "Program text shown. Copy it to keep or share."; });
+$("#b-copy").addEventListener("click", () => { const t = $("#io-text"); if (!t.value) $("#b-exp").click(); const done = () => $("#io-msg").textContent = "Copied."; (navigator.clipboard ? navigator.clipboard.writeText(t.value) : Promise.reject()).then(done).catch(() => { t.select(); $("#io-msg").textContent = "Text selected. Press Ctrl+C to copy."; }); });
+$("#b-imp").addEventListener("click", () => {
+  try { const d = JSON.parse($("#io-text").value); if (!MACHINES[d.machine] || !Array.isArray(d.rungs)) throw 0; const p = stamp(d.rungs);
+    setMachine(d.machine, d.exercise); prog = p; sel = null; changed(); $("#io-msg").textContent = "Program loaded."; }
+  catch (e) { $("#io-msg").textContent = "That text is not a saved program. Paste the full text and try again."; }
+});
+
+/* ================= boot ================= */
+const last = store.last && MACHINES[store.last[0]] ? store.last : ["conveyor", "demo"];
+setMachine(last[0], last[1]);
+requestAnimationFrame(t => { lastT = t; requestAnimationFrame(frame); });
+
+/* intro: remove when finished, or when clicked or a key is pressed */
+(function(){ const el=document.getElementById("intro"); if(!el) return; let gone=false;
+  const close=()=>{ if(gone) return; gone=true; el.style.animation="introOut .35s ease forwards"; setTimeout(()=>el.remove(),400); };
+  el.addEventListener("click",close); el.addEventListener("keydown",close);
+  el.addEventListener("animationend",e=>{ if(e.target===el && e.animationName==="introOut"){ gone=true; el.remove(); } });
+  setTimeout(close,5000); try{ el.focus({preventScroll:true}); }catch(e){} })();
+</script>
+
+</body>
+</html>
